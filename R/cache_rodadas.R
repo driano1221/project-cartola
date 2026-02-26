@@ -3,11 +3,35 @@ library(dplyr)
 CACHE_PATH <- "data/historico_rodadas.csv"
 
 # Extrai o número da rodada da resposta da API.
+# Ordem de prioridade:
+#   1) campo rodada_atual ou rodada no corpo principal da resposta
+#   2) endpoint /mercado/status (retorna rodada_id explicitamente)
+#   3) NA — não salva o cache se a rodada for desconhecida
 get_rodada_id <- function(cartola_raw) {
-  if (!is.null(cartola_raw$rodada_atual)) return(as.integer(cartola_raw$rodada_atual))
-  if (!is.null(cartola_raw$rodada))       return(as.integer(cartola_raw$rodada))
-  # Fallback: número da semana ISO como proxy de rodada
-  as.integer(format(Sys.Date(), "%V"))
+  if (!is.null(cartola_raw$rodada_atual) && !is.na(cartola_raw$rodada_atual))
+    return(as.integer(cartola_raw$rodada_atual))
+  if (!is.null(cartola_raw$rodada) && !is.na(cartola_raw$rodada))
+    return(as.integer(cartola_raw$rodada))
+
+  # Tenta o endpoint de status do mercado
+  status <- tryCatch({
+    resp <- httr::GET(
+      "https://api.cartola.globo.com/mercado/status",
+      httr::user_agent("Mozilla/5.0"),
+      httr::timeout(10)
+    )
+    if (!httr::http_error(resp))
+      jsonlite::fromJSON(httr::content(resp, as = "text", encoding = "UTF-8"))
+    else NULL
+  }, error = function(e) NULL)
+
+  if (!is.null(status$rodada_atual)) return(as.integer(status$rodada_atual))
+  if (!is.null(status$rodada_id))    return(as.integer(status$rodada_id))
+  if (!is.null(status$rodada))       return(as.integer(status$rodada))
+
+  # Rodada desconhecida — não salva para evitar dados com rótulo errado
+  message("[cache] AVISO: nao foi possivel determinar a rodada atual. Snapshot nao salvo.")
+  return(NA_integer_)
 }
 
 # Salva um snapshot dos dados brutos da rodada atual no cache local.
@@ -17,6 +41,8 @@ get_rodada_id <- function(cartola_raw) {
 salvar_snapshot_rodada <- function(cartola_raw) {
   rodada_id <- get_rodada_id(cartola_raw)
   df        <- cartola_raw$atletas
+
+  if (is.na(rodada_id)) return(invisible(NULL))
 
   if (is.null(df) || nrow(df) == 0) {
     message("[cache] Nenhum atleta na resposta — snapshot nao salvo.")
