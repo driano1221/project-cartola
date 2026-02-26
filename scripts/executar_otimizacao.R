@@ -38,8 +38,8 @@ if (!is.null(melhor_res_global)) {
   df_atletas$escalado <- as.vector(melhor_res_global$vetor)
   meu_time <- df_atletas %>% filter(escalado == 1)
 
-  # Capitão: maior média excluindo Técnico
-  id_capitao <- meu_time$id[which.max(ifelse(meu_time$posicao == "Técnico", -99, meu_time$media))]
+  # Capitão: maior expectativa_pontos excluindo Técnico (usa expectativa, não media bruta)
+  id_capitao <- meu_time$id[which.max(ifelse(meu_time$posicao == "Técnico", -99, meu_time$expectativa_pontos))]
   meu_time   <- meu_time %>% mutate(is_capitao = (id == id_capitao))
 
   # Pontuação esperada: soma das médias + bônus extra do capitão (0.5x, pois 1.5x total)
