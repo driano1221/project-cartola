@@ -47,8 +47,8 @@ plot_time <- function(df_time, esquema_nome, orcamento_total, pontos_previstos) 
     geom_point(data = subset(plot_data, is_capitao), aes(x=x, y=y), 
                size=12, color="gold", shape=1, stroke=2, alpha=0.8) +
     
-    # Rótulos com Nome e Média
-    geom_label_repel(aes(x=x, y=y, label=paste0(nome, "\n", round(media, 1), " pts")), 
+    # Rótulos com Label compacto e Média
+    geom_label_repel(aes(x=x, y=y, label=paste0(label, "\n", round(media, 1), " pts")),
                      size=3, fontface="bold", box.padding = 0.5, segment.color = "grey80",
                      alpha=0.9) +
     

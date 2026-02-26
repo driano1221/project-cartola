@@ -7,59 +7,56 @@ source("R/visualization_logic.R")
 ORCAMENTO <- 120.0 # Altere aqui seu patrimônio
 
 # 2. ETL
-cat("📥 Buscando dados...
-")
-dados_raw <- fetch_cartola_data()
-df_clubes <- process_clubes(dados_raw)
+cat("📥 Buscando dados...\n")
+dados_raw <- tryCatch(
+  fetch_cartola_data(),
+  error = function(e) { cat("❌", e$message, "\n"); stop() }
+)
+df_clubes  <- process_clubes(dados_raw)
 df_atletas <- process_atletas(dados_raw, df_clubes)
+cat(sprintf("✅ %d atletas disponíveis carregados.\n", nrow(df_atletas)))
 
 # 3. Otimização Multi-Esquema
-cat("🧠 Otimizando...
-")
-esquemas <- get_esquemas()
+cat("🧠 Otimizando múltiplos esquemas táticos...\n")
+esquemas          <- get_esquemas()
 melhor_res_global <- NULL
-max_pts <- -1
-melhor_nome_esq <- ""
+max_pts           <- -1
+melhor_nome_esq   <- ""
 
-for(nome in names(esquemas)) {
-  res <- resolver_otimizacao(df_atletas, ORCAMENTO, nome, esquemas[[nome]])
-  if(res$status == "ok" && res$valor > max_pts) {
-    max_pts <- res$valor
+for (nome in names(esquemas)) {
+  res <- resolver_otimizacao(df_atletas, ORCAMENTO, esquemas[[nome]], "expectativa_pontos")
+  if (res$status == "ok" && res$valor > max_pts) {
+    max_pts           <- res$valor
     melhor_res_global <- res
-    melhor_nome_esq <- nome
+    melhor_nome_esq   <- nome
   }
 }
 
 # 4. Resultado Final
-if(!is.null(melhor_res_global)) {
+if (!is.null(melhor_res_global)) {
   df_atletas$escalado <- as.vector(melhor_res_global$vetor)
   meu_time <- df_atletas %>% filter(escalado == 1)
-  
-  # Capitão
-  id_capitao <- meu_time$id[which.max(ifelse(meu_time$posicao=="Técnico", -99, meu_time$media))]
-  meu_time <- meu_time %>% mutate(is_capitao = (id == id_capitao))
-  
-  pontos_totais <- sum(meu_time$media) + max(meu_time$media[meu_time$posicao != "Técnico"])
-  
-  cat("
-✅ Melhor esquema encontrado:", melhor_nome_esq)
-  cat("
-💰 Custo total: C$", sum(meu_time$preco))
-  cat("
-🔥 Pontuação esperada:", pontos_totais, "
 
-")
-  
-  print(meu_time %>% select(posicao, nome, clube, preco, media))
-  
+  # Capitão: maior média excluindo Técnico
+  id_capitao <- meu_time$id[which.max(ifelse(meu_time$posicao == "Técnico", -99, meu_time$media))]
+  meu_time   <- meu_time %>% mutate(is_capitao = (id == id_capitao))
+
+  pontos_totais <- sum(meu_time$media) + max(meu_time$media[meu_time$posicao != "Técnico"])
+
+  cat("\n✅ Melhor esquema encontrado:", melhor_nome_esq)
+  cat("\n💰 Custo total: C$", sum(meu_time$preco))
+  cat("\n🔥 Pontuação esperada:", round(pontos_totais, 2), "\n\n")
+
+  print(meu_time %>% select(posicao, nome, clube, preco, media, expectativa_pontos))
+
   # Salvar resultado
   write.csv(meu_time, "output/time_otimizado.csv", row.names = FALSE)
-  
+
   # Gráfico
   p <- plot_time(meu_time, melhor_nome_esq, sum(meu_time$preco), pontos_totais)
   ggsave("output/campo_escala.png", p, width = 10, height = 7)
-  cat("🖼️ Gráfico salvo em: output/campo_escala.png\n")
+  cat("🖼️  Gráfico salvo em: output/campo_escala.png\n")
 } else {
-  cat("❌ Nenhuma solução encontrada para o orçamento de C$", ORCAMENTO, "
-")
+  cat("❌ Nenhuma solução encontrada para o orçamento de C$", ORCAMENTO, "\n")
+  cat("   Tente aumentar o orçamento ou verificar a disponibilidade dos atletas.\n")
 }
