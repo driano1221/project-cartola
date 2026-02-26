@@ -3,6 +3,9 @@ library(jsonlite)
 library(dplyr)
 library(purrr)
 
+source("R/cache_rodadas.R")
+source("R/sg_model.R")
+
 fetch_cartola_data <- function() {
   url <- "https://api.cartola.globo.com/atletas/mercado"
 
@@ -211,7 +214,70 @@ process_atletas <- function(cartola_raw, df_clubes) {
       )
     )
 
-  # Recalcula valoriza_provavel com a expectativa ajustada pelo confronto
+  # === TERCEIRA PASSAGEM: Integração de Dados Históricos (quando disponíveis) ===
+  #
+  # Usa o cache local (data/historico_rodadas.csv) acumulado rodada a rodada para:
+  #   forma_recente — média ponderada das últimas 5 rodadas (substitui media como base)
+  #                   quando disponível, produz expectativa_pontos mais precisa
+  #   std_pontos    — desvio padrão real das pontuações por rodada (mede risco/volatilidade)
+  #   prob_sg       — P(adversário marcar 0 gols) via Poisson: e^(-λ)
+  #                   ajusta expectativa de defensores/goleiros com base no confronto real
+  #
+  # Fallbacks automáticos quando o cache tem dados insuficientes (< 2 rodadas):
+  #   forma_recente → media_num da API    (comportamento original)
+  #   std_pontos    → 0                   (sem informação de risco)
+  #   prob_sg       → e^(-1.2) ≈ 0.30    (λ médio histórico do Brasileirão — neutro)
+
+  historico  <- carregar_historico_por_rodada()
+  stats_hist <- calcular_stats_atleta(historico)
+
+  # --- Forma recente e desvio padrão ---
+  if (!is.null(stats_hist) && nrow(stats_hist) > 0) {
+    df_atletas <- df_atletas %>%
+      left_join(
+        stats_hist %>% select(atleta_id, forma_recente, std_pontos),
+        by = "atleta_id"
+      ) %>%
+      mutate(
+        # Recalcula expectativa_pontos usando forma_recente como base quando disponível.
+        # Reaplicamos os dois ajustes anteriores (mando + forca_norm) para consistência.
+        expectativa_pontos = ifelse(
+          !is.na(forma_recente),
+          forma_recente *
+            ifelse(is_mandante, 1.15, 0.90) *
+            ifelse(is_defesa, 1 - 0.25 * forca_ataque_adversario_norm, 1),
+          expectativa_pontos
+        )
+      )
+  } else {
+    df_atletas$forma_recente <- NA_real_
+    df_atletas$std_pontos    <- NA_real_
+  }
+  # Fallback: forma_recente = media atual quando sem histórico
+  df_atletas$forma_recente[is.na(df_atletas$forma_recente)] <-
+    df_atletas$media[is.na(df_atletas$forma_recente)]
+  df_atletas$std_pontos[is.na(df_atletas$std_pontos)] <- 0
+
+  # --- Probabilidade de SG via modelo de Poisson ---
+  # λ do adversário estimado das últimas 5 rodadas do cache.
+  # Ajuste aditivo: (prob_sg - 0.30) × 5 pts
+  #   prob_sg > 0.30 → adversário fraco → bônus (> 0)
+  #   prob_sg < 0.30 → adversário forte → malus (< 0)
+  # Quando sem histórico: todos têm prob_sg = 0.30 → ajuste = 0 (neutro, sem dupla-contagem)
+  prob_sg_df <- calcular_prob_sg_por_clube(mapa_adv, historico)
+  df_atletas <- df_atletas %>%
+    left_join(prob_sg_df, by = "clube_id") %>%
+    mutate(
+      prob_sg = ifelse(is.na(prob_sg), exp(-1.2), prob_sg),
+      # Bônus/malus de SG: máximo ±1.5 pt (prob_sg ∈ [0.10, 0.50] na prática)
+      expectativa_pontos = ifelse(
+        is_defesa,
+        expectativa_pontos + (prob_sg - exp(-1.2)) * 5.0,
+        expectativa_pontos
+      )
+    )
+
+  # Recalcula valoriza_provavel com a expectativa final (após todas as passagens)
   df_atletas$valoriza_provavel <- df_atletas$min_val > 0 &
     df_atletas$expectativa_pontos >= df_atletas$min_val
 
@@ -222,6 +288,7 @@ process_atletas <- function(cartola_raw, df_clubes) {
       posicao, is_defesa, is_mandante,
       preco, media, media_scouts, variacao, min_val,
       expectativa_pontos, potencial_valorizacao, valoriza_provavel,
+      forma_recente, std_pontos, prob_sg,
       consistencia, escudo
     )
 }

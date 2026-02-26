@@ -8,6 +8,7 @@ cat("🚀 Iniciando Otimização para PONTOS (Mando de Campo + Risco Defensivo)
 ")
 
 dados_raw <- fetch_cartola_data()
+salvar_snapshot_rodada(dados_raw)
 df_atletas <- process_atletas(dados_raw, process_clubes(dados_raw))
 
 esquemas <- list("4-3-3" = c(Goleiro=1, Lateral=2, Zagueiro=2, Meia=3, Atacante=3, Técnico=1))
