@@ -12,6 +12,7 @@ dados_raw <- tryCatch(
   fetch_cartola_data(),
   error = function(e) { cat("❌", e$message, "\n"); stop() }
 )
+salvar_snapshot_rodada(dados_raw)
 df_clubes  <- process_clubes(dados_raw)
 df_atletas <- process_atletas(dados_raw, df_clubes)
 cat(sprintf("✅ %d atletas disponíveis carregados.\n", nrow(df_atletas)))

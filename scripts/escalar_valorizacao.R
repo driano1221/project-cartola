@@ -8,6 +8,7 @@ cat("💰 Iniciando Otimização para VALORIZAÇÃO (Ficar Rico)
 ")
 
 dados_raw  <- fetch_cartola_data()
+salvar_snapshot_rodada(dados_raw)
 df_atletas <- process_atletas(dados_raw, process_clubes(dados_raw))
 
 # Prioriza jogadores com valorização quase certa (expectativa >= MPV oficial da API).

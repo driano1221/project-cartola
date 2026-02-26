@@ -8,7 +8,9 @@ O **Project Cartola** é um ecossistema de Data Science e Pesquisa Operacional d
 
 O projeto é modularizado para garantir escalabilidade e fácil manutenção:
 
-*   **`R/data_processing.R`**: Motor de ETL (Extract, Transform, Load). Consome a API, calcula métricas derivadas e computa score de scouts com os pesos oficiais.
+*   **`R/data_processing.R`**: Motor de ETL (Extract, Transform, Load). Consome a API, calcula métricas derivadas e computa score de scouts com os pesos oficiais. Opera em **três passagens** sobre os dados.
+*   **`R/cache_rodadas.R`**: Gerencia o histórico local de rodadas (`data/historico_rodadas.csv`). Cada execução salva um snapshot; os deltas entre rodadas reconstroem a pontuação real por jogo.
+*   **`R/sg_model.R`**: Modelo de Poisson para probabilidade de Jogo Sem Gol. Estima λ de cada clube a partir do histórico local e calcula P(SG) = e^(−λ).
 *   **`R/optimization_logic.R`**: O "cérebro" matemático. Define as variáveis de decisão, restrições e funções objetivo usando o framework `CVXR`.
 *   **`R/visualization_logic.R`**: Camada de apresentação que traduz dados abstratos em um campo de futebol visual com escudos e posicionamento tático.
 *   **`scripts/`**: Orquestradores de alto nível para execução rápida.
@@ -75,7 +77,34 @@ Classi​fica jogadores por **variância de pontuação** sem precisar de dados 
 - **0** = depende de gols/assistências (alta variância, "apostador")
 - **1** = pontos vêm de DS/FF/DE/etc. (baixa variância, "consistente")
 
-### 7. Seleção de Capitão Inteligente
+### 7. Cache Local e Aprendizado Progressivo
+O sistema constrói seu próprio histórico rodada a rodada sem depender de datasets externos:
+
+- A cada execução, `salvar_snapshot_rodada()` salva scouts acumulados e média de cada atleta em `data/historico_rodadas.csv`
+- O delta entre snapshots consecutivos reconstrói a **pontuação real por rodada** (ex: `media * jogos` atual − anterior)
+- A partir de **2 rodadas** de cache, `forma_recente` e `std_pontos` são ativados automaticamente
+- O modelo de Poisson usa as últimas 5 rodadas para estimar λ de cada clube
+
+**Hierarquia de fallback** (quando cache é insuficiente):
+
+| Métrica | Com histórico | Sem histórico |
+| :--- | :--- | :--- |
+| `forma_recente` | Média ponderada (últimas 5 rodadas) | `media_num` da API |
+| `std_pontos` | Desvio padrão real por rodada | `0` (sem info) |
+| `prob_sg` | `e^(-λ)` com λ estimado do histórico | `e^(-1.2) ≈ 0.30` (neutro) |
+
+### 8. Probabilidade de SG via Modelo de Poisson
+Gols por partida seguem distribuição de Poisson com parâmetro λ. O modelo estima λ de cada clube a partir das últimas 5 rodadas do cache local:
+
+$$P(\text{SG} \mid \text{adversário}_j) = P(X = 0) = e^{-\lambda_j}$$
+
+- λ default = 1.2 gols/jogo ≈ média histórica da Série A
+- Ajuste aditivo para defensores/goleiros: `(prob_sg − 0.30) × 5 pts`
+  - Adversário fraco (prob_sg = 0.50) → bônus de +1.0 pt
+  - Adversário forte (prob_sg = 0.15) → malus de −0.75 pt
+- Quando sem histórico: prob_sg = 0.30 para todos → ajuste zero (neutro, sem viés)
+
+### 9. Seleção de Capitão Inteligente
 O capitão recebe **multiplicador de 1,5x** na pontuação (positiva e negativa). O sistema prioriza atacantes mandantes como capitão, seguido de meias mandantes. Técnicos são excluídos automaticamente da seleção de capitão.
 
 > ⚠️ **Atenção**: desde 2024 o multiplicador da braçadeira é **1,5x** (não mais 2x). Evite goleiros como capitão — cada gol sofrido vira **-1,5 pt** com a braçadeira.
@@ -116,6 +145,9 @@ $$\text{Maximizar } Z = \sum_{i=1}^{n} P_i \cdot x_i$$
 | `consistencia` | Proporção de pontos de scouts regulares (0 = volátil/gols, 1 = consistente/DS) | Calculada |
 | `adversario_id` | ID do clube adversário nesta rodada | API Globo |
 | `forca_ataque_adversario` | Média de expectativa dos atacantes+meias do adversário | Calculada |
+| `forma_recente` | Média ponderada das últimas 5 rodadas (pesos 5,4,3,2,1); fallback = `media` | Cache Local |
+| `std_pontos` | Desvio padrão real das pontuações por rodada (risco/volatilidade) | Cache Local |
+| `prob_sg` | P(adversário marcar 0 gols) via Poisson: `e^(-λ)`; default = 0.30 | Cache Local |
 | `escudo` | URL da imagem 60x60 do clube | CDN Globo |
 
 ---
