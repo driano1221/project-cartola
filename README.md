@@ -60,7 +60,22 @@ Todos os scouts disponíveis na API são computados com os **pesos oficiais do C
 
 Isso gera `media_scouts` (pontuação média baseada em scouts) como validação cruzada da `media_num` da API.
 
-### 5. Seleção de Capitão Inteligente
+### 5. Ajuste por Força do Adversário (Anti Conflict Stacking)
+O gol do atacante de time A é o **mesmo evento** que penaliza o goleiro/zagueiro de time B (-1 GS). Escalar ambos cria dependência negativa. O sistema resolve isso na etapa de ETL:
+
+- Calcula a `forca_ataque` de cada clube (média de `expectativa_pontos` dos atacantes+meias)
+- Normaliza para [0, 1] entre todos os clubes da rodada
+- Aplica penalidade de até **-25%** na `expectativa_pontos` de defensores/goleiros que enfrentam ataques fortes
+- O optimizer naturalmente prioriza defesas de times que enfrentam ataques fracos (maior P(SG))
+
+### 6. Consistência por Perfil de Scouts
+Classi​fica jogadores por **variância de pontuação** sem precisar de dados históricos:
+
+- `consistencia = scouts_regulares / (scouts_regulares + scouts_volateis)`
+- **0** = depende de gols/assistências (alta variância, "apostador")
+- **1** = pontos vêm de DS/FF/DE/etc. (baixa variância, "consistente")
+
+### 7. Seleção de Capitão Inteligente
 O capitão recebe **multiplicador de 1,5x** na pontuação (positiva e negativa). O sistema prioriza atacantes mandantes como capitão, seguido de meias mandantes. Técnicos são excluídos automaticamente da seleção de capitão.
 
 > ⚠️ **Atenção**: desde 2024 o multiplicador da braçadeira é **1,5x** (não mais 2x). Evite goleiros como capitão — cada gol sofrido vira **-1,5 pt** com a braçadeira.
@@ -96,8 +111,11 @@ $$\text{Maximizar } Z = \sum_{i=1}^{n} P_i \cdot x_i$$
 | `is_mandante` | Flag de mando de campo | Tabela de Jogos |
 | `expectativa_pontos` | `media` ajustada pelo mando de campo | Calculada |
 | `potencial_valorizacao` | Estimativa de valorização (3 níveis de precisão) | Calculada |
-| `valoriza_provavel` | `TRUE` quando expectativa ≥ MPV | Calculada |
+| `valoriza_provavel` | `TRUE` quando expectativa ≥ MPV (recalculado após ajuste de confronto) | Calculada |
 | `media_scouts` | Média calculada pelos scouts com pesos oficiais | Calculada |
+| `consistencia` | Proporção de pontos de scouts regulares (0 = volátil/gols, 1 = consistente/DS) | Calculada |
+| `adversario_id` | ID do clube adversário nesta rodada | API Globo |
+| `forca_ataque_adversario` | Média de expectativa dos atacantes+meias do adversário | Calculada |
 | `escudo` | URL da imagem 60x60 do clube | CDN Globo |
 
 ---

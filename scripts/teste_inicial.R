@@ -51,11 +51,21 @@ for (i in seq_len(nrow(resumo))) {
 cat("\n")
 
 # --- Teste 5: Top 5 por expectativa de pontos ---
-cat("5. Top 5 por expectativa de pontos (com mando de campo):\n")
+cat("5. Top 5 por expectativa de pontos (ajustada por confronto):\n")
 df_atletas %>%
   dplyr::arrange(dplyr::desc(expectativa_pontos)) %>%
   dplyr::slice(1:5) %>%
-  dplyr::select(nome, clube, posicao, preco, media, expectativa_pontos, variacao) %>%
+  dplyr::select(nome, clube, posicao, preco, media, expectativa_pontos, forca_ataque_adversario, consistencia) %>%
+  print()
+cat("\n")
+
+# --- Teste 6: Defensores mais consistentes com valorização provável ---
+cat("6. Top 5 defensores com valoriza_provavel e maior consistencia:\n")
+df_atletas %>%
+  dplyr::filter(is_defesa, valoriza_provavel) %>%
+  dplyr::arrange(dplyr::desc(consistencia)) %>%
+  dplyr::slice(1:5) %>%
+  dplyr::select(nome, clube, posicao, preco, media, min_val, consistencia, forca_ataque_adversario) %>%
   print()
 cat("\n")
 
