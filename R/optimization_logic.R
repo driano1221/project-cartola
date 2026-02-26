@@ -1,6 +1,17 @@
 library(CVXR)
 library(dplyr)
 
+# Retorna todos os esquemas taticos suportados (12 jogadores cada)
+get_esquemas <- function() {
+  list(
+    "4-3-3" = c(Goleiro=1, Lateral=2, Zagueiro=2, Meia=3, Atacante=3, Técnico=1),
+    "4-4-2" = c(Goleiro=1, Lateral=2, Zagueiro=2, Meia=4, Atacante=2, Técnico=1),
+    "3-5-2" = c(Goleiro=1, Lateral=2, Zagueiro=1, Meia=5, Atacante=2, Técnico=1),
+    "4-5-1" = c(Goleiro=1, Lateral=2, Zagueiro=2, Meia=5, Atacante=1, Técnico=1),
+    "3-4-3" = c(Goleiro=1, Lateral=2, Zagueiro=1, Meia=4, Atacante=3, Técnico=1)
+  )
+}
+
 resolver_otimizacao <- function(df_atletas, orcamento, limites_posicao, campo_objetivo = "expectativa_pontos") {
   n <- nrow(df_atletas)
   x <- Variable(n, boolean = TRUE)

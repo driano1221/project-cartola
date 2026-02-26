@@ -18,7 +18,9 @@ if(res$status == "ok") {
   df_atletas$escalado <- as.vector(res$vetor)
   meu_time <- df_atletas %>% filter(escalado == 1)
   
-  meu_time <- meu_time %>% mutate(is_capitao = (id == id[which.max(media)]))
+  # Capitão: maior média excluindo Técnico
+  id_capitao <- meu_time$id[which.max(ifelse(meu_time$posicao == "Técnico", -99, meu_time$media))]
+  meu_time   <- meu_time %>% mutate(is_capitao = (id == id_capitao))
   
   cat("
 ✅ Time para VALORIZAÇÃO escalado com sucesso!
