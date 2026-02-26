@@ -18,7 +18,8 @@ cat("   OK - resposta recebida\n\n")
 
 # --- Teste 2: Estrutura da resposta ---
 cat("2. Validando estrutura da resposta da API...\n")
-campos_obrigatorios <- c("atletas", "clubes", "posicoes", "partidas")
+# atletas/clubes/posicoes sao obrigatorios; partidas e opcional (ausente antes da rodada abrir)
+campos_obrigatorios <- c("atletas", "clubes", "posicoes")
 for (campo in campos_obrigatorios) {
   if (campo %in% names(dados_raw)) {
     cat(sprintf("   OK  '%s' presente\n", campo))
@@ -26,6 +27,11 @@ for (campo in campos_obrigatorios) {
     cat(sprintf("   ERRO '%s' ausente na resposta\n", campo))
     erros <- erros + 1
   }
+}
+if ("partidas" %in% names(dados_raw)) {
+  cat("   OK  'partidas' presente (ajustes de confronto ativos)\n")
+} else {
+  cat("   INFO 'partidas' ausente — normal antes da rodada abrir; ajustes de confronto neutros\n")
 }
 cat("\n")
 
@@ -76,12 +82,24 @@ cat("\n")
 
 # --- Teste 7: Defensores mais consistentes com valorização provável ---
 cat("7. Top 5 defensores com valoriza_provavel e maior prob_sg:\n")
-df_atletas %>%
+df_def_val <- df_atletas %>%
   dplyr::filter(is_defesa, valoriza_provavel) %>%
   dplyr::arrange(dplyr::desc(prob_sg)) %>%
   dplyr::slice(1:5) %>%
-  dplyr::select(nome, clube, posicao, preco, media, min_val, prob_sg, std_pontos, consistencia) %>%
-  print()
+  dplyr::select(nome, clube, posicao, preco, media, min_val, prob_sg, std_pontos, consistencia)
+
+if (nrow(df_def_val) > 0) {
+  print(df_def_val)
+} else {
+  cat("   INFO - nenhum defensor com valoriza_provavel=TRUE nesta rodada (min_val indisponivel ou expectativa abaixo do MPV)\n")
+  cat("   Mostrando top 5 defensores por expectativa:\n")
+  df_atletas %>%
+    dplyr::filter(is_defesa) %>%
+    dplyr::arrange(dplyr::desc(expectativa_pontos)) %>%
+    dplyr::slice(1:5) %>%
+    dplyr::select(nome, clube, posicao, preco, media, min_val, prob_sg, consistencia) %>%
+    print()
+}
 cat("\n")
 
 # --- Resultado Final ---
