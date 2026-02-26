@@ -13,6 +13,12 @@ get_esquemas <- function() {
 }
 
 resolver_otimizacao <- function(df_atletas, orcamento, limites_posicao, campo_objetivo = "expectativa_pontos") {
+  stopifnot(
+    "df_atletas deve ter >= 12 jogadores" = nrow(df_atletas) >= 12,
+    "campo_objetivo nao encontrado em df_atletas" = campo_objetivo %in% names(df_atletas),
+    "limites_posicao deve somar 12 (um tecnico incluido)" = sum(limites_posicao) == 12,
+    "orcamento deve ser positivo" = orcamento > 0
+  )
   n <- nrow(df_atletas)
   x <- Variable(n, boolean = TRUE)
   

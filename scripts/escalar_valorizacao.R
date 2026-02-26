@@ -32,8 +32,8 @@ if(res$status == "ok") {
   df_otimizar$escalado <- as.vector(res$vetor)
   meu_time <- df_otimizar %>% filter(escalado == 1)
   
-  # Capitão: maior média excluindo Técnico
-  id_capitao <- meu_time$id[which.max(ifelse(meu_time$posicao == "Técnico", -99, meu_time$media))]
+  # Capitão: maior expectativa_pontos excluindo Técnico
+  id_capitao <- meu_time$id[which.max(ifelse(meu_time$posicao == "Técnico", -99, meu_time$expectativa_pontos))]
   meu_time   <- meu_time %>% mutate(is_capitao = (id == id_capitao))
   
   cat("
