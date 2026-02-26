@@ -58,9 +58,10 @@ process_atletas <- function(cartola_raw, df_clubes) {
     }
   }
 
-  df_posicoes <- process_posicoes(cartola_raw)
-  partidas    <- cartola_raw$partidas
-  mandantes   <- c(partidas$clube_casa_id)
+  df_posicoes  <- process_posicoes(cartola_raw)
+  partidas     <- cartola_raw$partidas
+  has_partidas <- !is.null(partidas) && is.data.frame(partidas) && nrow(partidas) > 0
+  mandantes    <- if (has_partidas && "clube_casa_id" %in% names(partidas)) partidas$clube_casa_id else integer(0)
 
   # === PRIMEIRA PASSAGEM: ETL e cálculo de métricas base ===
   df_atletas <- cartola_raw$atletas %>%
@@ -178,16 +179,22 @@ process_atletas <- function(cartola_raw, df_clubes) {
     mutate(forca_ataque_norm = (forca_ataque - fa_min) / fa_range)
 
   # Mapa de adversarios desta rodada (bidirecional: casa<->visitante)
-  # Tenta os dois nomes possiveis do campo "visitante" na API
-  col_visitante <- intersect(c("clube_visitante_id", "clube_fora_id"), names(partidas))[1]
-
-  if (!is.na(col_visitante)) {
-    mapa_adv <- bind_rows(
-      data.frame(clube_id = partidas$clube_casa_id,
-                 adversario_id = partidas[[col_visitante]], stringsAsFactors = FALSE),
-      data.frame(clube_id = partidas[[col_visitante]],
-                 adversario_id = partidas$clube_casa_id, stringsAsFactors = FALSE)
-    ) %>% distinct(clube_id, .keep_all = TRUE)
+  # Tenta os dois nomes possiveis do campo "visitante" na API.
+  # Se a API nao retornar partidas (fora de temporada / antes da rodada abrir),
+  # usa mapa vazio — os ajustes de forca_adversario ficam neutros (0.5).
+  if (has_partidas) {
+    col_visitante <- intersect(c("clube_visitante_id", "clube_fora_id"), names(partidas))
+    col_visitante <- if (length(col_visitante) > 0) col_visitante[1] else NA_character_
+    if (!is.na(col_visitante)) {
+      mapa_adv <- bind_rows(
+        data.frame(clube_id = partidas$clube_casa_id,
+                   adversario_id = partidas[[col_visitante]], stringsAsFactors = FALSE),
+        data.frame(clube_id = partidas[[col_visitante]],
+                   adversario_id = partidas$clube_casa_id, stringsAsFactors = FALSE)
+      ) %>% distinct(clube_id, .keep_all = TRUE)
+    } else {
+      mapa_adv <- data.frame(clube_id = integer(0), adversario_id = integer(0))
+    }
   } else {
     mapa_adv <- data.frame(clube_id = integer(0), adversario_id = integer(0))
   }
