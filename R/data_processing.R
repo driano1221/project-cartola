@@ -67,22 +67,52 @@ process_atletas <- function(cartola_raw, df_clubes) {
       preco    = ifelse(is.na(preco_num), 0, preco_num),
       media    = ifelse(is.na(media_num), 0, media_num),
       jogos    = ifelse(is.na(jogos_num), 0, jogos_num),
-      # variacao_num: variacao de preco real da API (positivo = valorizou)
       variacao = ifelse(is.na(variacao_num), 0, variacao_num),
+      # Minimo de pontos necessarios para valorizar nesta rodada (da API oficial)
+      min_val  = get_col(., "minimo_para_valorizar"),
 
       is_mandante = clube_id %in% mandantes,
 
       # Fator Mando de Campo: +15% para mandantes, -10% para visitantes
       expectativa_pontos = ifelse(is_mandante, media * 1.15, media * 0.90),
 
-      # Potencial de Valorizacao:
-      #   1) usa variacao_num real da API quando disponivel (melhor estimativa)
-      #   2) cai para heuristica "Bom e Barato" na rodada 1 ou sem historico
+      # Potencial de Valorizacao (hierarquia de 3 niveis):
+      #   1) variacao_num real da API — melhor proxy quando disponivel (rodadas 2+)
+      #   2) media - min_val — quanto o jogador deve superar o minimo (rodadas com MPV)
+      #   3) heuristica "Bom e Barato" — fallback para rodada 1 sem historico
       potencial_valorizacao = ifelse(
         variacao != 0,
         variacao,
-        (media * 1.5) - preco
+        ifelse(min_val > 0, media - min_val, (media * 1.5) - preco)
       ),
+
+      # Flag: TRUE quando a expectativa de pontos ja supera o MPV — valorização quase certa
+      valoriza_provavel = min_val > 0 & expectativa_pontos >= min_val,
+
+      # Score de scouts da temporada usando os pesos oficiais do Cartola FC (2024+)
+      # Permite calcular uma media baseada em scouts como alternativa/validacao da media_num
+      pontos_scouts =
+        get_col(., "scout.G")  *  8.0 +
+        get_col(., "scout.A")  *  5.0 +
+        get_col(., "scout.SG") *  5.0 +
+        get_col(., "scout.DP") *  7.0 +
+        get_col(., "scout.FT") *  3.0 +
+        get_col(., "scout.DE") *  1.3 +
+        get_col(., "scout.DS") *  1.5 +
+        get_col(., "scout.FD") *  1.2 +
+        get_col(., "scout.FF") *  0.8 +
+        get_col(., "scout.FS") *  0.5 +
+        get_col(., "scout.PS") *  1.0 +
+        get_col(., "scout.GC") * (-3.0) +
+        get_col(., "scout.CV") * (-3.0) +
+        get_col(., "scout.GS") * (-1.0) +
+        get_col(., "scout.CA") * (-1.0) +
+        get_col(., "scout.PP") * (-4.0) +
+        get_col(., "scout.FC") * (-0.3) +
+        get_col(., "scout.I")  * (-0.1),
+
+      # Media por jogo calculada a partir dos scouts (deve ser proxima de media_num)
+      media_scouts = ifelse(jogos > 0, pontos_scouts / jogos, 0),
 
       is_defesa = posicao %in% c("Goleiro", "Lateral", "Zagueiro")
     ) %>%
@@ -100,7 +130,8 @@ process_atletas <- function(cartola_raw, df_clubes) {
     select(
       id = atleta_id, nome = apelido, label, clube, clube_id,
       posicao, is_defesa, is_mandante,
-      preco, media, variacao, expectativa_pontos, potencial_valorizacao,
+      preco, media, media_scouts, variacao, min_val,
+      expectativa_pontos, potencial_valorizacao, valoriza_provavel,
       escudo
     )
 }

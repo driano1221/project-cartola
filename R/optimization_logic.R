@@ -43,14 +43,28 @@ resolver_otimizacao <- function(df_atletas, orcamento, limites_posicao, campo_ob
   )
   
   # Objetivo (Pontos ou Valorização)
-  obj_vec <- df_atletas[[campo_objetivo]]
+  obj_vec <- as.numeric(df_atletas[[campo_objetivo]])
+  stopifnot(!any(is.na(obj_vec)), !any(is.infinite(obj_vec)))
   prob <- Problem(Maximize(t(obj_vec) %*% x), constraints)
-  
-  solver_usado <- ifelse("GLPK_MI" %in% installed_solvers(), "GLPK_MI", "ECOS_BB")
+
+  # Hierarquia robusta de solvers: prefere solvers mais confiaveis para MILP.
+  # ECOS_BB e o ultimo fallback — tem problemas documentados de corretude para MILP puro.
+  hierarquia_solvers <- c("GUROBI", "MOSEK", "CBC", "GLPK_MI", "ECOS_BB")
+  disponiveis        <- hierarquia_solvers[hierarquia_solvers %in% installed_solvers()]
+  if (length(disponiveis) == 0) stop("Nenhum solver MILP instalado. Instale o pacote 'Rglpk'.")
+  solver_usado <- disponiveis[1]
+
   res <- solve(prob, solver = solver_usado)
-  
-  if(res$status %in% c("optimal", "optimal_inaccurate")) {
-    return(list(status = "ok", valor = res$value, vetor = round(res$getValue(x))))
+
+  if (res$status == "optimal_inaccurate") {
+    warning(sprintf(
+      "Solver '%s' retornou optimal_inaccurate: solucao pode ser subotima. Considere instalar GLPK_MI.",
+      solver_usado
+    ))
+  }
+
+  if (res$status %in% c("optimal", "optimal_inaccurate")) {
+    return(list(status = "ok", valor = res$value, vetor = as.integer(round(res$getValue(x)))))
   } else {
     return(list(status = "error"))
   }
