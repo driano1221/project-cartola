@@ -18,15 +18,21 @@ if(res$status == "ok") {
   df_atletas$escalado <- as.vector(res$vetor)
   meu_time <- df_atletas %>% filter(escalado == 1)
   
-  # Lógica de Capitão Inteligente (Prioridade: Atacante > Meia, Mandante)
+  # Capitão Inteligente: maximiza ganho real do 1.5x (prioridade Atacante > Meia, mandante)
+  # Os pesos abaixo ranqueiam candidatos refletindo o benefício efetivo do 1.5x:
+  #   Atacante mandante: maior expectativa de gols + mando → maior ganho com 1.5x
+  #   Atacante visitante: alta expectativa, mas penalizado por mando
+  #   Meia mandante: segundo melhor candidato
+  #   Outros (incluindo Técnico): excluídos da priorização
   meu_time <- meu_time %>%
     mutate(peso_capitao = case_when(
-      posicao == "Atacante" & is_mandante ~ media * 2,
-      posicao == "Atacante" ~ media * 1.5,
-      posicao == "Meia" & is_mandante ~ media * 1.3,
-      TRUE ~ media
+      posicao == "Técnico"                  ~ -99,
+      posicao == "Atacante" & is_mandante   ~ expectativa_pontos * 1.5,
+      posicao == "Atacante"                 ~ expectativa_pontos * 1.3,
+      posicao == "Meia" & is_mandante       ~ expectativa_pontos * 1.2,
+      TRUE                                  ~ expectativa_pontos
     ))
-  
+
   id_capitao <- meu_time$id[which.max(meu_time$peso_capitao)]
   meu_time <- meu_time %>% mutate(is_capitao = (id == id_capitao))
   
@@ -35,6 +41,7 @@ if(res$status == "ok") {
 ")
   print(meu_time %>% select(posicao, nome, clube, preco, media))
   
+  dir.create("output", showWarnings = FALSE, recursive = TRUE)
   p <- plot_time(meu_time, "4-3-3 (Foco Pontos)", sum(meu_time$preco), res$valor)
   ggsave("output/time_pontos.png", p, width = 10, height = 7)
 }

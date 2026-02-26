@@ -42,15 +42,18 @@ if (!is.null(melhor_res_global)) {
   id_capitao <- meu_time$id[which.max(ifelse(meu_time$posicao == "Técnico", -99, meu_time$media))]
   meu_time   <- meu_time %>% mutate(is_capitao = (id == id_capitao))
 
-  pontos_totais <- sum(meu_time$media) + max(meu_time$media[meu_time$posicao != "Técnico"])
+  # Pontuação esperada: soma das médias + bônus extra do capitão (0.5x, pois 1.5x total)
+  media_capitao <- max(meu_time$media[meu_time$posicao != "Técnico"])
+  pontos_totais <- sum(meu_time$media) + 0.5 * media_capitao
 
   cat("\n✅ Melhor esquema encontrado:", melhor_nome_esq)
   cat("\n💰 Custo total: C$", sum(meu_time$preco))
-  cat("\n🔥 Pontuação esperada:", round(pontos_totais, 2), "\n\n")
+  cat("\n🔥 Pontuação esperada (c/ capitão 1.5x):", round(pontos_totais, 2), "\n\n")
 
   print(meu_time %>% select(posicao, nome, clube, preco, media, expectativa_pontos))
 
   # Salvar resultado
+  dir.create("output", showWarnings = FALSE, recursive = TRUE)
   write.csv(meu_time, "output/time_otimizado.csv", row.names = FALSE)
 
   # Gráfico
