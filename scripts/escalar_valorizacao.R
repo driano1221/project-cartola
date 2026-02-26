@@ -41,6 +41,7 @@ if(res$status == "ok") {
 ")
   print(meu_time %>% select(posicao, nome, clube, preco, media, min_val, potencial_valorizacao, valoriza_provavel))
   
+  dir.create("output", showWarnings = FALSE, recursive = TRUE)
   p <- plot_time(meu_time, "4-4-2 (Foco Valorização)", sum(meu_time$preco), sum(meu_time$media))
   ggsave("output/time_valorizacao.png", p, width = 10, height = 7)
 }
