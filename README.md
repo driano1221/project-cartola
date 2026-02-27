@@ -335,43 +335,34 @@ project-cartola/
 
 ---
 
-## Como Executar
+## 🛠️ Log de Atualizações Recentes
 
-### Pré-requisitos
+### **[27/02/2026] — Refatoração e Inteligência de Decisão**
+- **Orquestrador Unificado:** Criação do script `gerar_escalacao.R`, eliminando redundâncias e centralizando o pipeline.
+- **Interatividade Real:** Implementação de captura de teclado robusta via `stdin`, permitindo definir orçamento e objetivo em tempo real no terminal.
+- **Comparativo de Esquemas:** O sistema agora exibe uma tabela comparativa entre todas as formações viáveis (4-3-3, 3-4-3, etc.), mostrando qual delas entrega o melhor custo-benefício.
+- **Top 3 por Clube:** Adição de um relatório detalhado com os 3 melhores nomes de cada time da Série A, facilitando substituições manuais.
+- **Rigor na Expectativa:** Correção da pontuação projetada final para usar a **Expectativa Matemática Realista** (ajustada por mando e adversário) em vez da média bruta histórica.
+- **Conexão de Inteligências:** Integração total dos módulos de Poisson e Cache de Histórico ao fluxo principal de escalação.
 
-```r
-install.packages(c(
-  "httr", "jsonlite", "dplyr", "purrr",
-  "CVXR", "Rglpk",
-  "ggplot2", "ggsoccer", "ggimage", "ggrepel"
-))
-```
+---
 
-> No Windows, adicione `C:\Program Files\R\R-x.x.x\bin` ao PATH do sistema para usar `Rscript` em qualquer terminal.
+## 🚀 Como Executar
 
 ### Fluxo por Rodada
 
+Basta executar o orquestrador principal e seguir as instruções na tela:
+
 ```bash
-# 1. Validar o pipeline antes de otimizar
-Rscript scripts/teste_inicial.R
-
-# 2. Gerar o time otimizado (melhor esquema entre os 5)
-Rscript scripts/executar_otimizacao.R
-# → output/time_otimizado.csv
-# → output/campo_escala.png
-
-# Alternativas especializadas:
-Rscript scripts/escalar_pontos.R       # Foco em pontos — 4-3-3
-Rscript scripts/escalar_valorizacao.R  # Foco em valorização — 4-4-2
+Rscript scripts/gerar_escalacao.R
 ```
 
-### Ajustar Orçamento
+1.  **Orçamento:** Digite o seu patrimônio disponível (ex: `125.5`).
+2.  **Objetivo:** Escolha `1` para Pontos ou `2` para Valorização.
 
-Edite a variável `ORCAMENTO` no topo de qualquer script antes de executar:
-
-```r
-ORCAMENTO <- 120.0  # Seu patrimônio atual em Cartoletas
-```
+O sistema gerará automaticamente:
+- `output/time_pontos.csv` (ou `time_valorizacao.csv`)
+- `output/time_pontos.png` (ou `time_valorizacao.png`)
 
 ---
 

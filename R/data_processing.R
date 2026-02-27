@@ -290,7 +290,7 @@ process_atletas <- function(cartola_raw, df_clubes) {
 
   df_atletas %>%
     select(
-      id = atleta_id, nome = apelido, label, clube, clube_id,
+      id = atleta_id, nome = apelido, label, clube, clube_id, clube_nome,
       adversario_id, forca_ataque_adversario,
       posicao, is_defesa, is_mandante,
       preco, media, media_scouts, variacao, min_val,
